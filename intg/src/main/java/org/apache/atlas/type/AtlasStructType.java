@@ -43,6 +43,8 @@ import static org.apache.atlas.model.typedef.AtlasStructDef.AtlasConstraintDef.C
 public class AtlasStructType extends AtlasType {
     private static final Logger LOG = LoggerFactory.getLogger(AtlasStructType.class);
 
+    public static final String UNIQUE_ATTRIBUTE_SHADE_PROPERTY_PREFIX = "__u_";
+
     private final AtlasStructDef structDef;
 
     protected Map<String, AtlasAttribute> allAttributes  = Collections.emptyMap();
@@ -244,7 +246,7 @@ public class AtlasStructType extends AtlasType {
     }
 
     @Override
-    public boolean areEqualValues(Object val1, Object val2) {
+    public boolean areEqualValues(Object val1, Object val2, Map<String, String> guidAssignments) {
         boolean ret = true;
 
         if (val1 == null) {
@@ -264,21 +266,14 @@ public class AtlasStructType extends AtlasType {
                 } else if (!StringUtils.equalsIgnoreCase(structVal1.getTypeName(), structVal2.getTypeName())) {
                     ret = false;
                 } else {
-                    for (Map.Entry<String, Object> entry : structVal1.getAttributes().entrySet()) {
-                        String         attrName  = entry.getKey();
-                        AtlasAttribute attribute = getAttribute(attrName);
+                    for (AtlasAttribute attribute : getAllAttributes().values()) {
+                        Object attrValue1 = structVal1.getAttribute(attribute.getName());
+                        Object attrValue2 = structVal2.getAttribute(attribute.getName());
 
-                        if (attribute == null) { // ignore unknown attribute
-                            continue;
-                        } else {
-                            Object attrValue1 = entry.getValue();
-                            Object attrValue2 = structVal2.getAttribute(attrName);
+                        if (!attribute.getAttributeType().areEqualValues(attrValue1, attrValue2, guidAssignments)) {
+                            ret = false;
 
-                            if (!attribute.getAttributeType().areEqualValues(attrValue1, attrValue2)) {
-                                ret = false;
-
-                                break;
-                            }
+                            break;
                         }
                     }
                 }
@@ -704,6 +699,7 @@ public class AtlasStructType extends AtlasType {
         private final AtlasAttributeDef        attributeDef;
         private final String                   qualifiedName;
         private final String                   vertexPropertyName;
+        private final String                   vertexUniquePropertyName;
         private final boolean                  isOwnedRef;
         private final String                   inverseRefAttributeName;
         private AtlasAttribute                 inverseRefAttribute;
@@ -716,6 +712,7 @@ public class AtlasStructType extends AtlasType {
             this.attributeType            = attributeType.getTypeForAttribute();
             this.qualifiedName            = getQualifiedAttributeName(definedInType.getStructDef(), attributeDef.getName());
             this.vertexPropertyName       = encodePropertyKey(this.qualifiedName);
+            this.vertexUniquePropertyName = attrDef.getIsUnique() ? encodePropertyKey(getQualifiedAttributeName(definedInType.getStructDef(), UNIQUE_ATTRIBUTE_SHADE_PROPERTY_PREFIX + attributeDef.getName())) : null;
             this.relationshipEdgeLabel    = getRelationshipEdgeLabel(relationshipLabel);
             boolean isOwnedRef            = false;
             String  inverseRefAttribute   = null;
@@ -764,6 +761,8 @@ public class AtlasStructType extends AtlasType {
         public String getQualifiedName() { return qualifiedName; }
 
         public String getVertexPropertyName() { return vertexPropertyName; }
+
+        public String getVertexUniquePropertyName() { return vertexUniquePropertyName; }
 
         public boolean isOwnedRef() { return isOwnedRef; }
 
